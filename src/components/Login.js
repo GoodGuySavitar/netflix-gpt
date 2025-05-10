@@ -2,26 +2,70 @@ import React, { useRef } from 'react'
 import Header from './Header'
 import {useState} from "react"
 import {checkValidForm, checkValidFormSignUp} from "../utils/validate"
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth'
+import {auth} from "../utils/firebase"
+import { useNavigate } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
+import { addUser } from '../utils/userSlice'
+
 
 const Login = () => {
   const [isSignIn, setIsSignIn] = useState(true);
   const [formValidateMessage, setFormValidateMessage] = useState(null);
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const email = useRef(null);
   const password = useRef(null);
   const name = useRef(null);
   
   const loginFormValidation = () => {
-    // const message = checkValidForm(email.current.value, password.current.value)
-    // setFormValidateMessage(message)
-      {isSignIn ? setFormValidateMessage(checkValidForm(email.current.value, password.current.value)) : 
-      setFormValidateMessage(checkValidFormSignUp(email.current.value, password.current.value, name.current.value))}
+    const message = isSignIn ? setFormValidateMessage(checkValidForm(email.current.value, password.current.value)) : 
+    setFormValidateMessage(checkValidFormSignUp(email.current.value, password.current.value, name.current.value))
+    if(message) return;
+    
+    if(!isSignIn)
+    {
+      //Sign Up
+      createUserWithEmailAndPassword(auth, email.current.value, password.current.value)
+      .then((userCredential) => {
+        const user = userCredential.user;
+        updateProfile(user, {
+          displayName: name.current.value, 
+          photoURL: "https://avatars.githubusercontent.com/u/111289318?v=4",
+        }).then(() => {
+          const {uid, email, displayName, photoURL} = auth.currentUser;
+          dispatch(addUser({uid : uid, email: email, displayName: displayName, photoURL: photoURL}));
+          navigate("/browse")
+        }).catch((error) => {
+          setFormValidateMessage(error.message)
+        });
+      })
+      .catch((error) => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+        setFormValidateMessage(errorCode + " " + errorMessage);
+      })
+    }
+    else
+    {
+      signInWithEmailAndPassword(auth, email.current.value, password.current.value)
+      .then((userCredential) => {
+        // Signed in 
+        const user = userCredential.user;
+        navigate("/browse")
+      })
+      .catch((error) => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+        setFormValidateMessage(errorCode + " " + errorMessage);
+      });
+        }
   }
 
   const isSignInForm = () => {
     setIsSignIn(!isSignIn);
   };
-
 
   return (
     <div>
